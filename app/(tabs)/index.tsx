@@ -1,98 +1,260 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { StyleSheet, View, Text, FlatList, TouchableOpacity, Alert, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Bow } from '@/src/models';
+import { BowRepository } from '@/src/repositories/bow-repository';
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const router = useRouter();
+  const [bows, setBows] = useState<Bow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const loadBows = useCallback(async () => {
+    try {
+      const data = await BowRepository.getAll();
+      setBows(data);
+    } catch (error) {
+      console.error('Error loading bows:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadBows();
+    }, [loadBows])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadBows();
+  }, [loadBows]);
+
+  const handleDelete = (bow: Bow) => {
+    Alert.alert(
+      'Eliminar Arco',
+      `¿Estás seguro de que quieres eliminar el arco "${bow.name}"?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            if (bow.id) {
+              await BowRepository.delete(bow.id);
+              loadBows();
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSetDefault = async (bow: Bow) => {
+    if (bow.id) {
+      await BowRepository.setDefault(bow.id);
+      loadBows();
+    }
+  };
+
+  const renderBow = ({ item }: { item: Bow }) => (
+    <TouchableOpacity
+      style={styles.bowCard}
+      onPress={() => router.push(`/bow/${item.id}`)}
+    >
+      <View style={styles.bowInfo}>
+        <View style={styles.bowHeader}>
+          <Text style={styles.bowName}>{item.name}</Text>
+          {item.isDefault && (
+            <View style={styles.defaultBadge}>
+              <Text style={styles.defaultText}>Predeterminado</Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.bowType}>{item.type}</Text>
+        {item.model && <Text style={styles.bowDetail}>Modelo: {item.model}</Text>}
+        {item.power && <Text style={styles.bowDetail}>Potencia: {item.power} lbs</Text>}
+        {item.drawLength && <Text style={styles.bowDetail}>Apertura: {item.drawLength}&quot;</Text>}
+      </View>
+      <View style={styles.bowActions}>
+        {!item.isDefault && (
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => handleSetDefault(item)}
+          >
+            <Text style={styles.actionText}>Predeterminado</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.actionButton, styles.deleteButton]}
+          onPress={() => handleDelete(item)}
+        >
+          <Text style={styles.deleteText}>Eliminar</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>No hay arcos registrados</Text>
+      <Text style={styles.emptySubtext}>Crea tu primer arco para comenzar</Text>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Mis Arcos</Text>
+      </View>
+      <FlatList
+        data={bows}
+        keyExtractor={(item) => item.id?.toString() || '0'}
+        renderItem={renderBow}
+        contentContainerStyle={styles.list}
+        ListEmptyComponent={!loading ? renderEmpty : null}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      />
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => router.push('/bow/create')}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  list: {
+    padding: 16,
+    gap: 12,
+  },
+  bowCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  bowInfo: {
+    marginBottom: 12,
+  },
+  bowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 4,
+  },
+  bowName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+  },
+  defaultBadge: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  defaultText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  bowType: {
+    fontSize: 14,
+    color: '#666',
+    textTransform: 'capitalize',
+  },
+  bowDetail: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 2,
+  },
+  bowActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  actionButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#2196F3',
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  actionText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  deleteButton: {
+    backgroundColor: '#f44336',
+  },
+  deleteText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  fab: {
     position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2196F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  fabText: {
+    fontSize: 28,
+    color: '#fff',
+    fontWeight: '300',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    fontWeight: '500',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
   },
 });
