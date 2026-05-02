@@ -5,20 +5,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Bow } from '@/src/database/storage';
 import { BowRepository } from '@/src/repositories/bow-repository';
 
-type BowType = 'recurvo' | 'compuesto' | 'longbow';
-
-const BOW_TYPES: { value: BowType; label: string }[] = [
-  { value: 'recurvo', label: 'Recurvo' },
-  { value: 'compuesto', label: 'Compuesto' },
-  { value: 'longbow', label: 'Longbow' },
-];
-
 export default function EditBowScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [bow, setBow] = useState<Bow | null>(null);
   const [name, setName] = useState('');
-  const [selectedType, setSelectedType] = useState<BowType>('recurvo');
   const [model, setModel] = useState('');
   const [power, setPower] = useState('');
   const [drawLength, setDrawLength] = useState('');
@@ -26,18 +17,10 @@ export default function EditBowScreen() {
   const [string, setString] = useState('');
   const [isDefault, setIsDefault] = useState(false);
   
-  // Recurvo fields
+  // Campos especificos de recurvo
   const [limbs, setLimbs] = useState('');
   const [riser, setRiser] = useState('');
   
-  // Compuesto fields
-  const [letOff, setLetOff] = useState('');
-  const [ataLength, setAtaLength] = useState('');
-  const [braceHeight, setBraceHeight] = useState('');
-  
-  // Longbow fields
-  const [bowLength, setBowLength] = useState('');
-
   useEffect(() => {
     const loadBow = async () => {
       if (id) {
@@ -45,7 +28,6 @@ export default function EditBowScreen() {
         if (data) {
           setBow(data);
           setName(data.name);
-          setSelectedType(data.type as BowType);
           setModel(data.model || '');
           setPower(data.power?.toString() || '');
           setDrawLength(data.drawLength?.toString() || '');
@@ -54,10 +36,6 @@ export default function EditBowScreen() {
           setIsDefault(data.isDefault);
           setLimbs(data.limbs || '');
           setRiser(data.riser || '');
-          setLetOff(data.letOff?.toString() || '');
-          setAtaLength(data.ataLength?.toString() || '');
-          setBraceHeight(data.braceHeight?.toString() || '');
-          setBowLength(data.bowLength?.toString() || '');
         }
       }
     };
@@ -75,25 +53,16 @@ export default function EditBowScreen() {
     try {
       const bowData: any = {
         name: name.trim(),
-        type: selectedType,
+        type: 'recurvo',
         model: model.trim() || undefined,
         power: power ? parseInt(power, 10) : undefined,
         drawLength: drawLength ? parseFloat(drawLength) : undefined,
         arrows: arrows.trim() || undefined,
         string: string.trim() || undefined,
         isDefault,
+        limbs: limbs.trim() || undefined,
+        riser: riser.trim() || undefined,
       };
-      
-      if (selectedType === 'recurvo') {
-        bowData.limbs = limbs.trim() || undefined;
-        bowData.riser = riser.trim() || undefined;
-      } else if (selectedType === 'compuesto') {
-        bowData.letOff = letOff ? parseInt(letOff, 10) : undefined;
-        bowData.ataLength = ataLength ? parseFloat(ataLength) : undefined;
-        bowData.braceHeight = braceHeight ? parseFloat(braceHeight) : undefined;
-      } else if (selectedType === 'longbow') {
-        bowData.bowLength = bowLength ? parseFloat(bowLength) : undefined;
-      }
       
       await BowRepository.update(parseInt(id, 10), bowData);
       router.back();
@@ -101,91 +70,7 @@ export default function EditBowScreen() {
       console.error('Error updating bow:', error);
       Alert.alert('Error', 'No se pudo actualizar el arco');
     }
-  }, [name, selectedType, model, power, drawLength, arrows, string, isDefault, limbs, riser, letOff, ataLength, braceHeight, bowLength, id, router]);
-
-  const renderTypeFields = () => {
-    switch (selectedType) {
-      case 'recurvo':
-        return (
-          <>
-            <View style={styles.field}>
-              <Text style={styles.label}>Palas (superior/inferior)</Text>
-              <TextInput
-                style={styles.input}
-                value={limbs}
-                onChangeText={setLimbs}
-                placeholder="Ej: Carbono + Foam"
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.label}>Empunadura (riser)</Text>
-              <TextInput
-                style={styles.input}
-                value={riser}
-                onChangeText={setRiser}
-                placeholder="Ej: Aluminum"
-                placeholderTextColor="#999"
-              />
-            </View>
-          </>
-        );
-      case 'compuesto':
-        return (
-          <>
-            <View style={styles.field}>
-              <Text style={styles.label}>Let-off (%)</Text>
-              <TextInput
-                style={styles.input}
-                value={letOff}
-                onChangeText={setLetOff}
-                placeholder="65"
-                placeholderTextColor="#999"
-                keyboardType="numeric"
-              />
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.label}>Longitud del eje a eje (ATA)</Text>
-              <TextInput
-                style={styles.input}
-                value={ataLength}
-                onChangeText={setAtaLength}
-                placeholder="35"
-                placeholderTextColor="#999"
-                keyboardType="decimal-pad"
-              />
-            </View>
-            <View style={styles.field}>
-              <Text style={styles.label}>Altura del brace (pulgadas)</Text>
-              <TextInput
-                style={styles.input}
-                value={braceHeight}
-                onChangeText={setBraceHeight}
-                placeholder="7"
-                placeholderTextColor="#999"
-                keyboardType="decimal-pad"
-              />
-            </View>
-          </>
-        );
-      case 'longbow':
-        return (
-          <View style={styles.field}>
-            <Text style={styles.label}>Longitud del arco (pulgadas)</Text>
-            <TextInput
-              style={styles.input}
-              value={bowLength}
-              onChangeText={setBowLength}
-              placeholder="66"
-              placeholderTextColor="#999"
-              keyboardType="decimal-pad"
-            />
-          </View>
-        );
-      default:
-        return null;
-    }
-  };
+  }, [name, model, power, drawLength, arrows, string, isDefault, limbs, riser, id, router]);
 
   if (!bow) {
     return (
@@ -214,27 +99,6 @@ export default function EditBowScreen() {
             placeholder="Nombre del arco"
             placeholderTextColor="#999"
           />
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.label}>Tipo de arco</Text>
-          <View style={styles.typeSelector}>
-            {BOW_TYPES.map((type) => (
-              <TouchableOpacity
-                key={type.value}
-                style={[
-                  styles.typeOption,
-                  selectedType === type.value && styles.typeSelected,
-                ]}
-                onPress={() => setSelectedType(type.value)}
-              >
-                <Text style={[
-                  styles.typeText,
-                  selectedType === type.value && styles.typeTextSelected,
-                ]}>{type.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
 
         <View style={styles.field}>
@@ -294,7 +158,27 @@ export default function EditBowScreen() {
           />
         </View>
 
-        {renderTypeFields()}
+        <View style={styles.field}>
+          <Text style={styles.label}>Palas (superior/inferior)</Text>
+          <TextInput
+            style={styles.input}
+            value={limbs}
+            onChangeText={setLimbs}
+            placeholder="Ej: Carbono + Foam"
+            placeholderTextColor="#999"
+          />
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Empuñadura (riser)</Text>
+          <TextInput
+            style={styles.input}
+            value={riser}
+            onChangeText={setRiser}
+            placeholder="Ej: Aluminum"
+            placeholderTextColor="#999"
+          />
+        </View>
 
         <TouchableOpacity
           style={styles.defaultToggle}
@@ -360,30 +244,6 @@ const styles = StyleSheet.create({
     color: '#333',
     borderWidth: 1,
     borderColor: '#ddd',
-  },
-  typeSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  typeOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  typeSelected: {
-    backgroundColor: '#2196F3',
-    borderColor: '#2196F3',
-  },
-  typeText: {
-    fontSize: 14,
-    color: '#333',
-  },
-  typeTextSelected: {
-    color: '#fff',
   },
   defaultToggle: {
     flexDirection: 'row',

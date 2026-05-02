@@ -9,7 +9,7 @@ const STORAGE_KEYS = {
 export interface Bow {
   id: number;
   name: string;
-  type: 'recurvo' | 'compuesto' | 'longbow';
+  type: 'recurvo';
   model?: string;
   power?: number;
   drawLength?: number;
@@ -18,17 +18,9 @@ export interface Bow {
   isDefault: boolean;
   createdAt: string;
   
-  // Recurvo
+  // Campos especificos de recurvo
   limbs?: string;
   riser?: string;
-  
-  // Compuesto
-  letOff?: number;
-  ataLength?: number;
-  braceHeight?: number;
-  
-  // Longbow
-  bowLength?: number;
 }
 
 export interface Round {
